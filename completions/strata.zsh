@@ -40,4 +40,4 @@ _strata() {
     esac
 }
 
-_strata "$@"
+compdef _strata strata 2>/dev/null || true
