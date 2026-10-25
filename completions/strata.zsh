@@ -9,7 +9,8 @@ _strata() {
         'status:Check status of container and service API'
         'build:Build or rebuild Strata Docker image'
         'open:Open Strata Admin Web UI in default browser'
-        'monitor:Open Strata API Monitor in default browser'
+        'monitor:Open the chat page Monitor tab (#monitor)'
+        'api-monitor:Open the standalone Strata API Monitor page (/api-monitor)'
         'config:Codified configuration of Crush, Goose, and Pi'
         'crush:Launch Crush against Strata'
         'goose:Launch Goose against Strata'
@@ -31,6 +32,11 @@ _strata() {
                     local -a shells
                     shells=('bash:Generate Bash completion script' 'zsh:Generate Zsh completion script' 'install:Install completions to ~/.bashrc and ~/.zshrc')
                     _describe -t shells 'shell' shells
+                    ;;
+                monitor|api-monitor)
+                    local -a monitor_opts
+                    monitor_opts=('--enable:Turn the API request monitor on before opening it')
+                    _describe -t monitor_opts 'monitor options' monitor_opts
                     ;;
                 crush|goose|pi)
                     _files

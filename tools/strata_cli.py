@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 import json
 from pathlib import Path
 
@@ -17,12 +18,19 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 DEFAULT_BASE_URL = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}/v1"
 VRAM_RESERVE_MIB = 2048
+CONFIG_IN_VOLUME = "/data/config/strata-coder-iq1_m.json"
 
 
 def get_base_url():
     port = os.environ.get("STRATA_PORT", str(DEFAULT_PORT))
     host = os.environ.get("STRATA_HOST", DEFAULT_HOST)
     return f"http://{host}:{port}/v1"
+
+
+def get_root_url():
+    port = os.environ.get("STRATA_PORT", str(DEFAULT_PORT))
+    host = os.environ.get("STRATA_HOST", DEFAULT_HOST)
+    return f"http://{host}:{port}"
 
 
 def is_container_running():
@@ -88,9 +96,9 @@ def build_image_if_needed():
 def patch_vram_if_needed():
     """Ensure /data/config/strata-coder-iq1_m.json inside strata-data has the 2048 MiB reserve."""
     try:
-        check_script = """
-if [ -f /data/config/strata-coder-iq1_m.json ]; then
-    grep -q '"2048"' /data/config/strata-coder-iq1_m.json && echo "ALREADY_PATCHED" || echo "NEEDS_PATCH"
+        check_script = f"""
+if [ -f {CONFIG_IN_VOLUME} ]; then
+    grep -q '"2048"' {CONFIG_IN_VOLUME} && echo "ALREADY_PATCHED" || echo "NEEDS_PATCH"
 else
     echo "NO_CONFIG_YET"
 fi
@@ -104,8 +112,8 @@ fi
             print(f"[Strata Setup] Applying VRAM reservation patch ({VRAM_RESERVE_MIB} MiB) to strata-data volume...")
             patch_script = f"""
 apk add --no-cache jq >/dev/null 2>&1
-jq '.args += ["--vram-reserve-mib", "{VRAM_RESERVE_MIB}"]' /data/config/strata-coder-iq1_m.json > /tmp/patched.json
-mv /tmp/patched.json /data/config/strata-coder-iq1_m.json
+jq '.args += ["--vram-reserve-mib", "{VRAM_RESERVE_MIB}"]' {CONFIG_IN_VOLUME} > /tmp/patched.json
+mv /tmp/patched.json {CONFIG_IN_VOLUME}
 """
             subprocess.check_call(
                 ["docker", "run", "--rm", "-v", "strata-data:/data", "alpine", "sh", "-c", patch_script]
@@ -114,6 +122,36 @@ mv /tmp/patched.json /data/config/strata-coder-iq1_m.json
     except Exception as e:
         # Non-fatal if config doesn't exist yet or alpine fails
         print(f"[Strata Setup] Note: VRAM patch check skipped ({e})")
+
+
+def http_status(path, timeout_s=2):
+    """The status code of a GET on the service, or None when the service is not reachable."""
+    try:
+        req = urllib.request.Request(f"{get_root_url()}{path}", headers={"User-Agent": "strata-cli"})
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            return resp.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:
+        return None
+
+
+def enable_api_monitor():
+    """api_monitor=true in the run config on the strata-data volume; the server reads it when it starts."""
+    script = f"""
+if [ ! -f {CONFIG_IN_VOLUME} ]; then echo MISSING; exit 1; fi
+apk add --no-cache jq >/dev/null 2>&1
+jq '.api_monitor = true' {CONFIG_IN_VOLUME} > /tmp/monitor_on.json || exit 1
+mv /tmp/monitor_on.json {CONFIG_IN_VOLUME}
+"""
+    try:
+        subprocess.check_call(["docker", "run", "--rm", "-v", "strata-data:/data", "alpine", "sh", "-c", script],
+                              text=True)
+        print(f"api_monitor=true saved in {CONFIG_IN_VOLUME}; the monitor records from the next start on.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Could not update {CONFIG_IN_VOLUME}: {e}")
+        return False
 
 
 def is_service_ready(timeout_s=3):
@@ -271,10 +309,49 @@ def cmd_open(args):
     return open_in_browser(f"http://{host}:{port}/")
 
 
+def monitor_is_on():
+    """True when the service answers 200 at /api-monitor, which it only does with the monitor on."""
+    return http_status("/api-monitor") == 200
+
+
+def turn_monitor_on(args):
+    """The monitor saved in the run config and the service restarted with it; False when that failed."""
+    if not enable_api_monitor():
+        return False
+    print("Restarting the service with the monitor on...")
+    return cmd_restart(args) == 0
+
+
 def cmd_monitor(args):
-    port = os.environ.get("STRATA_PORT", str(DEFAULT_PORT))
-    host = os.environ.get("STRATA_HOST", DEFAULT_HOST)
-    return open_in_browser(f"http://{host}:{port}/api-monitor")
+    """The chat page's Monitor tab (#monitor): there always, but it records only with the monitor on."""
+    if http_status("/") is None:
+        print("Strata service is not reachable. Run `strata start` first.")
+        return 1
+    if not monitor_is_on():
+        if getattr(args, "enable", False):
+            if not turn_monitor_on(args):
+                return 1
+        else:
+            print("The API request monitor is off, so the #monitor tab shows no requests.")
+            print("Run `strata monitor --enable` to turn it on (saves api_monitor=true in the run config and restarts).")
+    return open_in_browser(f"{get_root_url()}/#monitor")
+
+
+def cmd_api_monitor(args):
+    """The standalone monitor page at /api-monitor, which the server only serves with the monitor on."""
+    status = http_status("/api-monitor")
+    if status is None:
+        print("Strata service is not reachable. Run `strata start` first.")
+        return 1
+    if status != 200:
+        if not getattr(args, "enable", False):
+            print("The API request monitor is off, so /api-monitor answers 404: it keeps the last 100 requests'")
+            print("prompts and answers in memory, and is opt-in. Run `strata api-monitor --enable` to turn it on")
+            print("(saves api_monitor=true in the run config and restarts the service).")
+            return 1
+        if not turn_monitor_on(args):
+            return 1
+    return open_in_browser(f"{get_root_url()}/api-monitor")
 
 
 def cmd_config(args):
@@ -370,7 +447,8 @@ Examples:
   strata status             Check health and loaded models
   strata build              Build or rebuild Strata Docker image
   strata open               Open Admin Web UI in browser
-  strata monitor            Open API Monitor in browser
+  strata monitor            Open the chat page's Monitor tab (#monitor)
+  strata api-monitor        Open the standalone API Monitor page (/api-monitor)
   strata config             Codified setup for Crush, Goose, Pi
   strata completion install Install shell completions to ~/.zshrc & ~/.bashrc
   strata crush              Run Crush in the current directory
@@ -386,7 +464,14 @@ Examples:
     subparsers.add_parser("status", help="Check status of container and service API")
     subparsers.add_parser("build", help="Build or rebuild Strata Docker image")
     subparsers.add_parser("open", help="Open Strata Admin Web UI in browser")
-    subparsers.add_parser("monitor", help="Open Strata API Monitor in browser")
+    monitor_parser = subparsers.add_parser("monitor", help="Open the chat page's Monitor tab (#monitor)")
+    monitor_parser.add_argument("--enable", action="store_true",
+                                help="turn the monitor on first (saves api_monitor=true in the run config and restarts)")
+
+    api_monitor_parser = subparsers.add_parser("api-monitor",
+                                               help="Open the standalone API Monitor page (/api-monitor)")
+    api_monitor_parser.add_argument("--enable", action="store_true",
+                                    help="turn the monitor on first (saves api_monitor=true in the run config and restarts)")
     subparsers.add_parser("config", help="Codified configuration of Crush, Goose, and Pi")
 
     comp_parser = subparsers.add_parser("completion", help="Generate or install shell completion")
@@ -417,6 +502,8 @@ Examples:
         sys.exit(cmd_open(args))
     elif args.command == "monitor":
         sys.exit(cmd_monitor(args))
+    elif args.command == "api-monitor":
+        sys.exit(cmd_api_monitor(args))
     elif args.command == "config":
         sys.exit(cmd_config(args))
     elif args.command == "completion":
