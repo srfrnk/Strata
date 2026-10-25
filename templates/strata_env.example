@@ -1,0 +1,8 @@
+# Strata inference environment settings
+STRATA_HOST=127.0.0.1
+STRATA_PORT=8080
+STRATA_BASE_URL=http://127.0.0.1:8080/v1
+STRATA_MODEL=qwen3.8-flash-next-coder-iq1_m
+STRATA_CONTEXT_WINDOW=131072
+STRATA_MAX_TOKENS=4096
+STRATA_API_KEY=none

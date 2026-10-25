@@ -1,0 +1,15 @@
+{
+  "name": "strata",
+  "engine": "openai",
+  "display_name": "Strata Local",
+  "description": "Local Strata Inference Service",
+  "api_key_env": "STRATA_API_KEY",
+  "base_url": "${STRATA_BASE_URL}",
+  "models": [
+    {
+      "name": "${STRATA_MODEL}",
+      "context_limit": ${STRATA_CONTEXT_WINDOW}
+    }
+  ],
+  "supports_streaming": true
+}

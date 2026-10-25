@@ -1,0 +1,11 @@
+provider add strata --type openai-compat \
+  --base-url "${STRATA_BASE_URL}" \
+  --api-key "${STRATA_API_KEY}"
+
+model add strata/${STRATA_MODEL} \
+  --name "Strata ${STRATA_MODEL}" \
+  --context-window ${STRATA_CONTEXT_WINDOW} \
+  --default-max-tokens ${STRATA_MAX_TOKENS}
+
+model large strata/${STRATA_MODEL}
+model small strata/${STRATA_MODEL}

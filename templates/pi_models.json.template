@@ -1,0 +1,18 @@
+{
+  "baseUrl": "${STRATA_BASE_URL}",
+  "api": "openai-completions",
+  "apiKey": "${STRATA_API_KEY}",
+  "compat": {
+    "supportsDeveloperRole": false,
+    "supportsReasoningEffort": false
+  },
+  "models": [
+    {
+      "id": "${STRATA_MODEL}",
+      "name": "Strata ${STRATA_MODEL}",
+      "contextWindow": ${STRATA_CONTEXT_WINDOW},
+      "maxTokens": ${STRATA_MAX_TOKENS},
+      "toolCalling": true
+    }
+  ]
+}
