@@ -61,6 +61,15 @@ else
   echo "Installed Pi successfully."
 fi
 
+# 4. Hermes Agent
+if command -v hermes >/dev/null 2>&1; then
+  echo "Hermes is already installed at: $(command -v hermes)"
+else
+  echo "Installing Hermes Agent..."
+  curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --non-interactive
+  echo "Installed Hermes Agent successfully."
+fi
+
 echo "=== 2. Rendering Agent Configurations from Templates ==="
 
 # Python template renderer to safely substitute vars
@@ -140,5 +149,44 @@ with open(settings_path, 'w') as f:
     json.dump(settings, f, indent=2)
 "
 echo "Configured Pi provider & defaults: ${PI_AGENT_DIR}/models.json and settings.json"
+
+# --- Hermes Config ---
+HERMES_CONFIG_DIR="${HOME}/.hermes"
+mkdir -p "${HERMES_CONFIG_DIR}"
+python3 -c "
+import os, string
+from pathlib import Path
+
+template_path = Path('${TEMPLATES_DIR}/hermes_config.yaml.template')
+config_path = Path('${HERMES_CONFIG_DIR}/config.yaml')
+
+with open(template_path, 'r') as f:
+    rendered = string.Template(f.read()).safe_substitute(os.environ)
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+if yaml:
+    parsed = yaml.safe_load(rendered) or {}
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                data = yaml.safe_load(f) or {}
+        except Exception:
+            data = {}
+        if not isinstance(data.get('model'), dict):
+            data['model'] = {}
+        data['model'].update(parsed.get('model') or {})
+    else:
+        data = parsed
+    with open(config_path, 'w') as f:
+        yaml.safe_dump(data, f, default_flow_style=False)
+elif not config_path.exists():
+    with open(config_path, 'w') as f:
+        f.write(rendered)
+"
+echo "Configured Hermes: ${HERMES_CONFIG_DIR}/config.yaml"
 
 echo "=== Codified configuration completed successfully! ==="

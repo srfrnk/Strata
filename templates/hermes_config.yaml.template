@@ -1,0 +1,5 @@
+model:
+  default: ${STRATA_MODEL}
+  provider: custom
+  base_url: ${STRATA_BASE_URL}
+  context_length: ${STRATA_CONTEXT_WINDOW}

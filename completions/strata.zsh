@@ -11,10 +11,11 @@ _strata() {
         'open:Open Strata Admin Web UI in default browser'
         'monitor:Open the chat page Monitor tab (#monitor)'
         'api-monitor:Open the standalone Strata API Monitor page (/api-monitor)'
-        'config:Codified configuration of Crush, Goose, and Pi'
+        'config:Codified configuration of Crush, Goose, Pi, and Hermes'
         'crush:Launch Crush against Strata'
         'goose:Launch Goose against Strata'
         'pi:Launch Pi against Strata'
+        'hermes:Launch Hermes against Strata'
         'completion:Generate or install shell completion (bash/zsh)'
     )
 
@@ -38,7 +39,7 @@ _strata() {
                     monitor_opts=('--enable:Turn the API request monitor on before opening it')
                     _describe -t monitor_opts 'monitor options' monitor_opts
                     ;;
-                crush|goose|pi)
+                crush|goose|pi|hermes)
                     _files
                     ;;
             esac

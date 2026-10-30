@@ -4,7 +4,7 @@ _strata_completion() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="start stop restart status build open monitor api-monitor config crush goose pi completion"
+    local commands="start stop restart status build open monitor api-monitor config crush goose pi hermes completion"
 
     if [[ ${cword} -eq 1 ]]; then
         COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )
@@ -22,7 +22,7 @@ _strata_completion() {
                 COMPREPLY=( $(compgen -W "--enable" -- "${cur}") )
             fi
             ;;
-        crush|goose|pi)
+        crush|goose|pi|hermes)
             # Default file completion for arguments passed to agents
             _filedir
             ;;

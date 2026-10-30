@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unified CLI and switcher for Strata and connected coding agents (Crush, Goose, Pi)."""
+"""Unified CLI and switcher for Strata and connected coding agents (Crush, Goose, Pi, Hermes)."""
 
 import argparse
 import os
@@ -297,7 +297,7 @@ def cmd_status(args):
 
     # Check Agents
     print("\nAgents Installed in PATH:")
-    for agent in ["crush", "goose", "pi"]:
+    for agent in ["crush", "goose", "pi", "hermes"]:
         agent_path = subprocess.run(["which", agent], capture_output=True, text=True).stdout.strip()
         print(f"  - {agent}: {agent_path if agent_path else 'Not found'}")
     return 0
@@ -449,11 +449,12 @@ Examples:
   strata open               Open Admin Web UI in browser
   strata monitor            Open the chat page's Monitor tab (#monitor)
   strata api-monitor        Open the standalone API Monitor page (/api-monitor)
-  strata config             Codified setup for Crush, Goose, Pi
+  strata config             Codified setup for Crush, Goose, Pi, Hermes
   strata completion install Install shell completions to ~/.zshrc & ~/.bashrc
   strata crush              Run Crush in the current directory
   strata goose              Run Goose in the current directory
   strata pi                 Run Pi in the current directory
+  strata hermes             Run Hermes in the current directory
         """
     )
     subparsers = parser.add_subparsers(dest="command")
@@ -472,7 +473,7 @@ Examples:
                                                help="Open the standalone API Monitor page (/api-monitor)")
     api_monitor_parser.add_argument("--enable", action="store_true",
                                     help="turn the monitor on first (saves api_monitor=true in the run config and restarts)")
-    subparsers.add_parser("config", help="Codified configuration of Crush, Goose, and Pi")
+    subparsers.add_parser("config", help="Codified configuration of Crush, Goose, Pi, and Hermes")
 
     comp_parser = subparsers.add_parser("completion", help="Generate or install shell completion")
     comp_parser.add_argument("shell", choices=["bash", "zsh", "install"], help="Shell type or 'install' to add to rc files")
@@ -485,6 +486,9 @@ Examples:
 
     pi_parser = subparsers.add_parser("pi", help="Launch Pi against Strata")
     pi_parser.add_argument("agent_args", nargs=argparse.REMAINDER)
+
+    hermes_parser = subparsers.add_parser("hermes", help="Launch Hermes against Strata")
+    hermes_parser.add_argument("agent_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
 
@@ -508,7 +512,7 @@ Examples:
         sys.exit(cmd_config(args))
     elif args.command == "completion":
         sys.exit(cmd_completion(args))
-    elif args.command in ["crush", "goose", "pi"]:
+    elif args.command in ["crush", "goose", "pi", "hermes"]:
         sys.exit(cmd_run_agent(args.command, args.agent_args))
     else:
         parser.print_help()
